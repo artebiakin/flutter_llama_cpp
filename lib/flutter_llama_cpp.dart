@@ -1,3 +1,34 @@
+/// Flutter plugin for llama.cpp integration via Dart FFI.
+/// 
+/// This plugin provides a high-level Dart API for running Large Language Models
+/// using llama.cpp as the inference engine.
+/// 
+/// ## Dependencies
+/// - llama.cpp: Version b6316 (statically linked)
+/// - ggml: Included with llama.cpp
+/// 
+/// ## Supported Platforms
+/// - Android (arm64-v8a)
+/// - iOS (arm64)  
+/// - macOS (arm64, x86_64)
+/// - Windows (x86_64)
+/// - Linux (x86_64)
+/// 
+/// ## Example Usage
+/// ```dart
+/// // Initialize the plugin
+/// final result = LlamaFlutter.initialize();
+/// if (result.isSuccess) {
+///   // Load a model
+///   final modelResult = LlamaModel.load('path/to/model.gguf');
+///   if (modelResult.isSuccess) {
+///     final model = modelResult.value;
+///     // Use the model...
+///   }
+/// }
+/// ```
+library;
+
 import 'dart:ffi';
 import 'dart:io';
 
@@ -389,21 +420,22 @@ class LlamaResult<T> {
 }
 
 /// The dynamic library that contains the llama.cpp implementation
+/// Built with llama.cpp version b6316
 final DynamicLibrary _dylib = () {
   if (Platform.isMacOS || Platform.isIOS) {
     // For native assets on Apple platforms, try framework first
     try {
-      return DynamicLibrary.open('llama_flutter.framework/llama_flutter');
+      return DynamicLibrary.open('flutter_llama_cpp.framework/flutter_llama_cpp');
     } catch (e) {
       // Fallback to process lookup
       return DynamicLibrary.process();
     }
   }
   if (Platform.isAndroid || Platform.isLinux) {
-    return DynamicLibrary.open('libllama_flutter.so');
+    return DynamicLibrary.open('libflutter_llama_cpp.so');
   }
   if (Platform.isWindows) {
-    return DynamicLibrary.open('llama_flutter.dll');
+    return DynamicLibrary.open('flutter_llama_cpp.dll');
   }
   throw UnsupportedError('Unknown platform: ${Platform.operatingSystem}');
 }();

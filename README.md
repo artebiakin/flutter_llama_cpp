@@ -166,9 +166,9 @@ A result type that represents either success or error.
 
 ### Building from Source
 
-1. Initialize the llama.cpp submodule:
+1. Check vendor dependency versions:
 ```bash
-git submodule update --init --recursive
+./tool/check_versions.sh
 ```
 
 2. Generate FFI bindings:
@@ -182,9 +182,16 @@ cd example
 flutter run
 ```
 
-### Project Structure
+### Updating Dependencies
 
-The project has been refactored for better organization:
+To update llama.cpp to a newer version:
+```bash
+./tool/update_llama_cpp.sh <commit-hash>
+```
+
+For more details, see [`VENDOR_DEPENDENCIES.md`](VENDOR_DEPENDENCIES.md).
+
+### Project Structure
 
 ```
 flutter_llama_cpp/
@@ -197,25 +204,26 @@ flutter_llama_cpp/
 │   ├── flutter_llama_cpp_stub.c                    # Stub for testing
 │   ├── CMakeLists.txt                               # CMake build configuration
 │   └── vendor/
-│       └── llama.cpp/                               # llama.cpp git subtree
+│       └── llama.cpp/                               # llama.cpp (b6316)
+├── tool/                                            # Development tools
+│   ├── check_versions.sh                           # Check vendor versions
+│   ├── update_llama_cpp.sh                         # Update llama.cpp
+│   └── version_info.yaml                           # Version tracking
 ├── hook/
 │   └── build.dart                                   # Native assets build hook
 ├── ffigen.yaml                                      # FFI generation config
+├── VENDOR_DEPENDENCIES.md                          # Dependency documentation
 └── example/                                         # Demo application
 ```
-
-### Recent Changes
-
-- **Simplified naming**: Changed from `llama_flutter_*` to `flutter_llama_cpp_*`
-- **Moved sources**: Relocated from `native/` to `src/` directory
-- **Added llama.cpp**: Integrated as git subtree in `src/vendor/llama.cpp/`
-- **Updated paths**: All documentation and build files reflect new structure
 
 ### Architecture
 
 The plugin uses a layered architecture:
 
 1. **llama.cpp** - The core C++ inference engine (`src/vendor/llama.cpp/`)
+   - Version: `b6316` (commit hash)
+   - Source: https://github.com/ggerganov/llama.cpp
+   - Integration: Git subtree for version control
 2. **C++ Shim Layer** (`src/`) - Stable C API wrapper
 3. **FFI Bindings** (`lib/flutter_llama_cpp_bindings_generated.dart`) - Generated Dart bindings
 4. **High-level API** (`lib/flutter_llama_cpp.dart`) - Type-safe Dart interface

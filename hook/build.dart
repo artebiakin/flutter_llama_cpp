@@ -6,9 +6,10 @@ import 'package:native_toolchain_c/native_toolchain_c.dart';
 Future<void> main(List<String> args) async {
   await build(args, (input, output) async {
     // Build native library using the native_toolchain_c package
+    // llama.cpp version: b6316 (integrated via git subtree)
     final cbuilder = CBuilder.library(
-      name: 'llama_flutter',
-      assetName: 'llama_flutter',
+      name: 'flutter_llama_cpp',
+      assetName: 'flutter_llama_cpp',
       sources: [
         'src/flutter_llama_cpp_stub.c',  // Use stub version for now
       ],

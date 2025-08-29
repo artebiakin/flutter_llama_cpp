@@ -1,0 +1,32 @@
+# Version tracking for vendored dependencies
+dependencies:
+  llama_cpp:
+    version: "b6316"
+    commit_hash: "b6316"
+    actual_commit: "009b709d"
+    repository: "https://github.com/ggerganov/llama.cpp"
+    added_date: "2025-08-29"
+    location: "src/vendor/llama.cpp/"
+    integration_method: "git_subtree"
+    notes: "Core inference engine - stable release with mobile optimizations"
+    
+  ggml:
+    version: "included_with_llama_cpp"
+    location: "src/vendor/llama.cpp/ggml/"
+    notes: "Tensor library - comes bundled with llama.cpp"
+
+# Update procedures
+update_commands:
+  llama_cpp: |
+    git subtree pull --prefix=src/vendor/llama.cpp https://github.com/ggerganov/llama.cpp <new-commit> --squash
+    
+# Build verification
+build_requirements:
+  cmake_minimum: "3.18"
+  cpp_standard: "17"
+  platforms:
+    - android_arm64
+    - ios_arm64
+    - macos_universal
+    - windows_x64
+    - linux_x64

@@ -1,6 +1,10 @@
+# Flutter Llama.cpp Plugin - Native Build Configuration
+# llama.cpp version: b6316 (29 August 2025)
+# Repository: https://github.com/ggerganov/llama.cpp
+
 cmake_minimum_required(VERSION 3.18)
 
-project(llama_flutter LANGUAGES C CXX)
+project(flutter_llama_cpp VERSION 0.0.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -27,7 +31,10 @@ endif()
 # Find llama.cpp
 set(LLAMA_CPP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendor/llama.cpp")
 
-# Configure llama.cpp build
+# Configure llama.cpp build (version b6316)
+set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
 set(GGML_STATIC ON CACHE BOOL "ggml: static lib")
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
 set(GGML_NATIVE OFF CACHE BOOL "ggml: use -march=native")
@@ -47,48 +54,48 @@ endif()
 add_subdirectory(${LLAMA_CPP_DIR} llama_cpp EXCLUDE_FROM_ALL)
 
 # Create the main library
-add_library(llama_flutter SHARED
+add_library(flutter_llama_cpp SHARED
     flutter_llama_cpp.c
 )
 
 # Set target properties
-set_target_properties(llama_flutter PROPERTIES
+set_target_properties(flutter_llama_cpp PROPERTIES
     CXX_VISIBILITY_PRESET hidden
     C_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
 )
 
 # Include directories
-target_include_directories(llama_flutter PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/shim
+target_include_directories(flutter_llama_cpp PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${LLAMA_CPP_DIR}/include
     ${LLAMA_CPP_DIR}/ggml/include
     ${LLAMA_CPP_DIR}/common
 )
 
 # Link libraries
-target_link_libraries(llama_flutter PRIVATE
+target_link_libraries(flutter_llama_cpp PRIVATE
     llama
     ggml
 )
 
 # Platform-specific linking
 if(APPLE)
-    target_link_libraries(llama_flutter PRIVATE
+    target_link_libraries(flutter_llama_cpp PRIVATE
         "-framework Accelerate"
         "-framework Foundation"
     )
 endif()
 
 if(ANDROID)
-    target_link_libraries(llama_flutter PRIVATE
+    target_link_libraries(flutter_llama_cpp PRIVATE
         log
         android
     )
 endif()
 
 # Install the library
-install(TARGETS llama_flutter
+install(TARGETS flutter_llama_cpp
     LIBRARY DESTINATION .
     ARCHIVE DESTINATION .
     RUNTIME DESTINATION .
