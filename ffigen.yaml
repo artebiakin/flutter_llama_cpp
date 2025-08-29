@@ -1,19 +1,31 @@
 # Run with `dart run ffigen --config ffigen.yaml`.
-name: FlutterLlamaCppBindings
+name: LlamaFlutterBindings
 description: |
-  Bindings for `src/flutter_llama_cpp.h`.
+  Bindings for `native/shim/llama_flutter.h`.
 
   Regenerate bindings with `dart run ffigen --config ffigen.yaml`.
-output: 'lib/flutter_llama_cpp_bindings_generated.dart'
+output: 'lib/llama_flutter_bindings_generated.dart'
 headers:
   entry-points:
-    - 'src/flutter_llama_cpp.h'
+    - 'native/shim/llama_flutter.h'
   include-directives:
-    - 'src/flutter_llama_cpp.h'
+    - 'native/shim/llama_flutter.h'
 preamble: |
   // ignore_for_file: always_specify_types
   // ignore_for_file: camel_case_types
   // ignore_for_file: non_constant_identifier_names
+functions:
+  include:
+    - 'lf_.*'  # Include all functions starting with lf_
+structs:
+  include:
+    - 'lf_.*'  # Include all structs starting with lf_
+enums:
+  include:
+    - 'lf_.*'  # Include all enums starting with lf_
+typedefs:
+  include:
+    - 'lf_.*'  # Include all typedefs starting with lf_
 comments:
   style: any
   length: full
