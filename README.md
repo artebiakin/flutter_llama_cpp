@@ -182,14 +182,43 @@ cd example
 flutter run
 ```
 
+### Project Structure
+
+The project has been refactored for better organization:
+
+```
+flutter_llama_cpp/
+├── lib/
+│   ├── flutter_llama_cpp.dart                      # High-level Dart API
+│   └── flutter_llama_cpp_bindings_generated.dart   # Generated FFI bindings
+├── src/
+│   ├── flutter_llama_cpp.h                         # C API header
+│   ├── flutter_llama_cpp.c                         # C implementation
+│   ├── flutter_llama_cpp_stub.c                    # Stub for testing
+│   ├── CMakeLists.txt                               # CMake build configuration
+│   └── vendor/
+│       └── llama.cpp/                               # llama.cpp git subtree
+├── hook/
+│   └── build.dart                                   # Native assets build hook
+├── ffigen.yaml                                      # FFI generation config
+└── example/                                         # Demo application
+```
+
+### Recent Changes
+
+- **Simplified naming**: Changed from `llama_flutter_*` to `flutter_llama_cpp_*`
+- **Moved sources**: Relocated from `native/` to `src/` directory
+- **Added llama.cpp**: Integrated as git subtree in `src/vendor/llama.cpp/`
+- **Updated paths**: All documentation and build files reflect new structure
+
 ### Architecture
 
 The plugin uses a layered architecture:
 
-1. **llama.cpp** - The core C++ inference engine
-2. **C++ Shim Layer** (`native/shim/`) - Stable C API wrapper
-3. **FFI Bindings** (`lib/llama_flutter_bindings_generated.dart`) - Generated Dart bindings
-4. **High-level API** (`lib/llama_flutter.dart`) - Type-safe Dart interface
+1. **llama.cpp** - The core C++ inference engine (`src/vendor/llama.cpp/`)
+2. **C++ Shim Layer** (`src/`) - Stable C API wrapper
+3. **FFI Bindings** (`lib/flutter_llama_cpp_bindings_generated.dart`) - Generated Dart bindings
+4. **High-level API** (`lib/flutter_llama_cpp.dart`) - Type-safe Dart interface
 5. **Build Hook** (`hook/build.dart`) - Native asset compilation
 
 ## Platform Support

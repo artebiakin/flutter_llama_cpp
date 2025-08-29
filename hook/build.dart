@@ -10,10 +10,10 @@ Future<void> main(List<String> args) async {
       name: 'llama_flutter',
       assetName: 'llama_flutter',
       sources: [
-        'native/shim/llama_flutter_stub.c',  // Use stub version for now
+        'src/flutter_llama_cpp_stub.c',  // Use stub version for now
       ],
       includes: [
-        'native/shim/',
+        'src/',
       ],
     );
 

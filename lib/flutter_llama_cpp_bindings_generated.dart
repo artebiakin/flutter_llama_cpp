@@ -12,58 +12,362 @@ import 'dart:ffi' as ffi;
 ///
 /// Regenerate bindings with `dart run ffigen --config ffigen.yaml`.
 ///
-class FlutterLlamaCppBindings {
+class LlamaFlutterBindings {
   /// Holds the symbol lookup function.
   final ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName)
-      _lookup;
+  _lookup;
 
   /// The symbols are looked up in [dynamicLibrary].
-  FlutterLlamaCppBindings(ffi.DynamicLibrary dynamicLibrary)
-      : _lookup = dynamicLibrary.lookup;
+  LlamaFlutterBindings(ffi.DynamicLibrary dynamicLibrary)
+    : _lookup = dynamicLibrary.lookup;
 
   /// The symbols are looked up with [lookup].
-  FlutterLlamaCppBindings.fromLookup(
-      ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName)
-          lookup)
-      : _lookup = lookup;
+  LlamaFlutterBindings.fromLookup(
+    ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName) lookup,
+  ) : _lookup = lookup;
 
-  /// A very short-lived native function.
-  ///
-  /// For very short-lived functions, it is fine to call them on the main isolate.
-  /// They will block the Dart execution while running the native function, so
-  /// only do this for native functions which are guaranteed to be short-lived.
-  int sum(
-    int a,
-    int b,
+  /// Initialize the llama.cpp library.
+  /// Must be called before any other functions.
+  /// @return LF_OK on success, error code on failure
+  lf_error_t lf_init() {
+    return lf_error_t.fromValue(_lf_init());
+  }
+
+  late final _lf_initPtr = _lookup<ffi.NativeFunction<ffi.Int Function()>>(
+    'lf_init',
+  );
+  late final _lf_init = _lf_initPtr.asFunction<int Function()>();
+
+  /// Get library information.
+  /// @param info_buffer Buffer to write info string (null-terminated)
+  /// @param buffer_size Size of the buffer
+  /// @return LF_OK on success, error code on failure
+  lf_error_t lf_info(ffi.Pointer<ffi.Char> info_buffer, int buffer_size) {
+    return lf_error_t.fromValue(_lf_info(info_buffer, buffer_size));
+  }
+
+  late final _lf_infoPtr =
+      _lookup<
+        ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>, ffi.Size)>
+      >('lf_info');
+  late final _lf_info = _lf_infoPtr
+      .asFunction<int Function(ffi.Pointer<ffi.Char>, int)>();
+
+  /// Get the last error message.
+  /// @param error_buffer Buffer to write error string (null-terminated)
+  /// @param buffer_size Size of the buffer
+  /// @return LF_OK on success, error code on failure
+  lf_error_t lf_last_error(
+    ffi.Pointer<ffi.Char> error_buffer,
+    int buffer_size,
   ) {
-    return _sum(
-      a,
-      b,
+    return lf_error_t.fromValue(_lf_last_error(error_buffer, buffer_size));
+  }
+
+  late final _lf_last_errorPtr =
+      _lookup<
+        ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>, ffi.Size)>
+      >('lf_last_error');
+  late final _lf_last_error = _lf_last_errorPtr
+      .asFunction<int Function(ffi.Pointer<ffi.Char>, int)>();
+
+  /// Load a model from file.
+  /// @param model_path Path to the GGUF model file
+  /// @param model Pointer to store the loaded model
+  /// @return LF_OK on success, error code on failure
+  lf_error_t lf_model_load(
+    ffi.Pointer<ffi.Char> model_path,
+    ffi.Pointer<ffi.Pointer<lf_model>> model,
+  ) {
+    return lf_error_t.fromValue(_lf_model_load(model_path, model));
+  }
+
+  late final _lf_model_loadPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int Function(
+            ffi.Pointer<ffi.Char>,
+            ffi.Pointer<ffi.Pointer<lf_model>>,
+          )
+        >
+      >('lf_model_load');
+  late final _lf_model_load = _lf_model_loadPtr
+      .asFunction<
+        int Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Pointer<lf_model>>)
+      >();
+
+  /// Get model information.
+  /// @param model Model handle
+  /// @param info Pointer to store model information
+  /// @return LF_OK on success, error code on failure
+  lf_error_t lf_model_info(
+    ffi.Pointer<lf_model> model,
+    ffi.Pointer<lf_model_info_t> info,
+  ) {
+    return lf_error_t.fromValue(_lf_model_info(model, info));
+  }
+
+  late final _lf_model_infoPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int Function(ffi.Pointer<lf_model>, ffi.Pointer<lf_model_info_t>)
+        >
+      >('lf_model_info');
+  late final _lf_model_info = _lf_model_infoPtr
+      .asFunction<
+        int Function(ffi.Pointer<lf_model>, ffi.Pointer<lf_model_info_t>)
+      >();
+
+  /// Free a loaded model.
+  /// @param model Model to free
+  void lf_model_free(ffi.Pointer<lf_model> model) {
+    return _lf_model_free(model);
+  }
+
+  late final _lf_model_freePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<lf_model>)>>(
+        'lf_model_free',
+      );
+  late final _lf_model_free = _lf_model_freePtr
+      .asFunction<void Function(ffi.Pointer<lf_model>)>();
+
+  /// Create a context for inference.
+  /// @param model Model handle
+  /// @param n_ctx Context size (0 for model default)
+  /// @param context Pointer to store the created context
+  /// @return LF_OK on success, error code on failure
+  lf_error_t lf_context_create(
+    ffi.Pointer<lf_model> model,
+    int n_ctx,
+    ffi.Pointer<ffi.Pointer<lf_context>> context,
+  ) {
+    return lf_error_t.fromValue(_lf_context_create(model, n_ctx, context));
+  }
+
+  late final _lf_context_createPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int Function(
+            ffi.Pointer<lf_model>,
+            ffi.Int32,
+            ffi.Pointer<ffi.Pointer<lf_context>>,
+          )
+        >
+      >('lf_context_create');
+  late final _lf_context_create = _lf_context_createPtr
+      .asFunction<
+        int Function(
+          ffi.Pointer<lf_model>,
+          int,
+          ffi.Pointer<ffi.Pointer<lf_context>>,
+        )
+      >();
+
+  /// Free a context.
+  /// @param context Context to free
+  void lf_context_free(ffi.Pointer<lf_context> context) {
+    return _lf_context_free(context);
+  }
+
+  late final _lf_context_freePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<lf_context>)>>(
+        'lf_context_free',
+      );
+  late final _lf_context_free = _lf_context_freePtr
+      .asFunction<void Function(ffi.Pointer<lf_context>)>();
+
+  /// Evaluate a prompt and prepare for generation.
+  /// @param context Context handle
+  /// @param prompt Input prompt text
+  /// @return LF_OK on success, error code on failure
+  lf_error_t lf_eval_prompt(
+    ffi.Pointer<lf_context> context,
+    ffi.Pointer<ffi.Char> prompt,
+  ) {
+    return lf_error_t.fromValue(_lf_eval_prompt(context, prompt));
+  }
+
+  late final _lf_eval_promptPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int Function(ffi.Pointer<lf_context>, ffi.Pointer<ffi.Char>)
+        >
+      >('lf_eval_prompt');
+  late final _lf_eval_prompt = _lf_eval_promptPtr
+      .asFunction<
+        int Function(ffi.Pointer<lf_context>, ffi.Pointer<ffi.Char>)
+      >();
+
+  /// Generate the next token.
+  /// @param context Context handle
+  /// @param params Generation parameters
+  /// @param token_buffer Buffer to write the generated token text
+  /// @param buffer_size Size of the buffer
+  /// @param is_eos Set to true if this is the end-of-sequence token
+  /// @return LF_OK on success, error code on failure
+  lf_error_t lf_generate_next(
+    ffi.Pointer<lf_context> context,
+    ffi.Pointer<lf_generation_params_t> params,
+    ffi.Pointer<ffi.Char> token_buffer,
+    int buffer_size,
+    ffi.Pointer<ffi.Bool> is_eos,
+  ) {
+    return lf_error_t.fromValue(
+      _lf_generate_next(context, params, token_buffer, buffer_size, is_eos),
     );
   }
 
-  late final _sumPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int)>>('sum');
-  late final _sum = _sumPtr.asFunction<int Function(int, int)>();
+  late final _lf_generate_nextPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int Function(
+            ffi.Pointer<lf_context>,
+            ffi.Pointer<lf_generation_params_t>,
+            ffi.Pointer<ffi.Char>,
+            ffi.Size,
+            ffi.Pointer<ffi.Bool>,
+          )
+        >
+      >('lf_generate_next');
+  late final _lf_generate_next = _lf_generate_nextPtr
+      .asFunction<
+        int Function(
+          ffi.Pointer<lf_context>,
+          ffi.Pointer<lf_generation_params_t>,
+          ffi.Pointer<ffi.Char>,
+          int,
+          ffi.Pointer<ffi.Bool>,
+        )
+      >();
 
-  /// A longer lived native function, which occupies the thread calling it.
-  ///
-  /// Do not call these kind of native functions in the main isolate. They will
-  /// block Dart execution. This will cause dropped frames in Flutter applications.
-  /// Instead, call these native functions on a separate isolate.
-  int sum_long_running(
-    int a,
-    int b,
-  ) {
-    return _sum_long_running(
-      a,
-      b,
-    );
+  /// Cancel ongoing generation.
+  /// @param context Context handle
+  /// @return LF_OK on success, error code on failure
+  lf_error_t lf_cancel(ffi.Pointer<lf_context> context) {
+    return lf_error_t.fromValue(_lf_cancel(context));
   }
 
-  late final _sum_long_runningPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int)>>(
-          'sum_long_running');
-  late final _sum_long_running =
-      _sum_long_runningPtr.asFunction<int Function(int, int)>();
+  late final _lf_cancelPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<lf_context>)>>(
+        'lf_cancel',
+      );
+  late final _lf_cancel = _lf_cancelPtr
+      .asFunction<int Function(ffi.Pointer<lf_context>)>();
+
+  /// Reset context state.
+  /// @param context Context handle
+  /// @return LF_OK on success, error code on failure
+  lf_error_t lf_reset(ffi.Pointer<lf_context> context) {
+    return lf_error_t.fromValue(_lf_reset(context));
+  }
+
+  late final _lf_resetPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<lf_context>)>>(
+        'lf_reset',
+      );
+  late final _lf_reset = _lf_resetPtr
+      .asFunction<int Function(ffi.Pointer<lf_context>)>();
+
+  /// Get default generation parameters.
+  /// @param params Pointer to store default parameters
+  void lf_generation_params_default(
+    ffi.Pointer<lf_generation_params_t> params,
+  ) {
+    return _lf_generation_params_default(params);
+  }
+
+  late final _lf_generation_params_defaultPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Void Function(ffi.Pointer<lf_generation_params_t>)
+        >
+      >('lf_generation_params_default');
+  late final _lf_generation_params_default = _lf_generation_params_defaultPtr
+      .asFunction<void Function(ffi.Pointer<lf_generation_params_t>)>();
+}
+
+final class lf_model extends ffi.Opaque {}
+
+final class lf_context extends ffi.Opaque {}
+
+/// Error codes
+enum lf_error_t {
+  LF_OK(0),
+  LF_ERROR_INIT(-1),
+  LF_ERROR_MODEL_LOAD(-2),
+  LF_ERROR_CONTEXT_CREATE(-3),
+  LF_ERROR_INVALID_PARAM(-4),
+  LF_ERROR_OUT_OF_MEMORY(-5),
+  LF_ERROR_CANCELLED(-6),
+  LF_ERROR_UNKNOWN(-999);
+
+  final int value;
+  const lf_error_t(this.value);
+
+  static lf_error_t fromValue(int value) => switch (value) {
+    0 => LF_OK,
+    -1 => LF_ERROR_INIT,
+    -2 => LF_ERROR_MODEL_LOAD,
+    -3 => LF_ERROR_CONTEXT_CREATE,
+    -4 => LF_ERROR_INVALID_PARAM,
+    -5 => LF_ERROR_OUT_OF_MEMORY,
+    -6 => LF_ERROR_CANCELLED,
+    -999 => LF_ERROR_UNKNOWN,
+    _ => throw ArgumentError("Unknown value for lf_error_t: $value"),
+  };
+}
+
+/// Model information structure
+final class lf_model_info_t extends ffi.Struct {
+  @ffi.Array.multi([256])
+  external ffi.Array<ffi.Char> name;
+
+  @ffi.Array.multi([64])
+  external ffi.Array<ffi.Char> architecture;
+
+  @ffi.Int32()
+  external int vocab_size;
+
+  @ffi.Int32()
+  external int n_ctx_max;
+
+  @ffi.Int32()
+  external int n_embd;
+
+  @ffi.Int32()
+  external int n_params;
+
+  @ffi.Size()
+  external int size_bytes;
+}
+
+/// Generation parameters
+final class lf_generation_params_t extends ffi.Struct {
+  /// Number of tokens to predict (-1 for infinite, -2 for until context filled)
+  @ffi.Int32()
+  external int n_predict;
+
+  /// Top-k sampling
+  @ffi.Int32()
+  external int top_k;
+
+  /// Top-p sampling
+  @ffi.Float()
+  external double top_p;
+
+  /// Temperature
+  @ffi.Float()
+  external double temp;
+
+  /// Repetition penalty
+  @ffi.Float()
+  external double repeat_penalty;
+
+  /// Penalize newlines
+  @ffi.Bool()
+  external bool penalize_nl;
+
+  /// RNG seed (-1 for random)
+  @ffi.Int32()
+  external int seed;
 }

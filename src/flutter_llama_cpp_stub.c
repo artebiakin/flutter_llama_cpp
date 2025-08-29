@@ -1,4 +1,4 @@
-#include "llama_flutter.h"
+#include "flutter_llama_cpp.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>

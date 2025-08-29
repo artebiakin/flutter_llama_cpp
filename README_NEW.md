@@ -186,10 +186,10 @@ flutter run
 
 The plugin uses a layered architecture:
 
-1. **llama.cpp** - The core C++ inference engine
-2. **C++ Shim Layer** (`native/shim/`) - Stable C API wrapper
-3. **FFI Bindings** (`lib/llama_flutter_bindings_generated.dart`) - Generated Dart bindings
-4. **High-level API** (`lib/llama_flutter.dart`) - Type-safe Dart interface
+1. **llama.cpp** - The core C++ inference engine (`src/vendor/llama.cpp/`)
+2. **C++ Shim Layer** (`src/`) - Stable C API wrapper
+3. **FFI Bindings** (`lib/flutter_llama_cpp_bindings_generated.dart`) - Generated Dart bindings
+4. **High-level API** (`lib/flutter_llama_cpp.dart`) - Type-safe Dart interface
 5. **Build Hook** (`hook/build.dart`) - Native asset compilation
 
 ## Platform Support
