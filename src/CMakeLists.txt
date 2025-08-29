@@ -1,22 +1,102 @@
-# The Flutter tooling requires that developers have CMake 3.10 or later
-# installed. You should not increase this version, as doing so will cause
-# the plugin to fail to compile for some customers of the plugin.
-cmake_minimum_required(VERSION 3.10)
+# Flutter Llama.cpp Plugin - Native Build Configuration
+# llama.cpp version: b6316 (29 August 2025)
+# Repository: https://github.com/ggerganov/llama.cpp
 
-project(flutter_llama_cpp_library VERSION 0.0.1 LANGUAGES C)
+cmake_minimum_required(VERSION 3.18)
 
-add_library(flutter_llama_cpp SHARED
-  "flutter_llama_cpp.c"
-)
+project(flutter_llama_cpp VERSION 0.0.1 LANGUAGES C CXX)
 
-set_target_properties(flutter_llama_cpp PROPERTIES
-  PUBLIC_HEADER flutter_llama_cpp.h
-  OUTPUT_NAME "flutter_llama_cpp"
-)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-target_compile_definitions(flutter_llama_cpp PUBLIC DART_SHARED_LIB)
-
-if (ANDROID)
-  # Support Android 15 16k page size
-  target_link_options(flutter_llama_cpp PRIVATE "-Wl,-z,max-page-size=16384")
+# Build type
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
 endif()
+
+# Compiler flags
+set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG -ffast-math")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -ffast-math")
+
+# Platform-specific settings
+if(APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
+        set(CMAKE_OSX_ARCHITECTURES "arm64")
+    else()
+        set(CMAKE_OSX_ARCHITECTURES "x86_64")
+    endif()
+endif()
+
+# Find llama.cpp
+set(LLAMA_CPP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendor/llama.cpp")
+
+# Configure llama.cpp build (version b6316)
+set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+set(GGML_STATIC ON CACHE BOOL "ggml: static lib")
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
+set(GGML_NATIVE OFF CACHE BOOL "ggml: use -march=native")
+set(GGML_LTO OFF CACHE BOOL "ggml: use link time optimization")
+
+# Platform-specific llama.cpp options
+if(APPLE)
+    set(GGML_METAL OFF CACHE BOOL "ggml: use Metal")
+    set(GGML_ACCELERATE ON CACHE BOOL "ggml: use Accelerate framework")
+endif()
+
+if(ANDROID)
+    set(GGML_OPENMP OFF CACHE BOOL "ggml: use OpenMP")
+endif()
+
+# Add llama.cpp subdirectory
+add_subdirectory(${LLAMA_CPP_DIR} llama_cpp EXCLUDE_FROM_ALL)
+
+# Create the main library
+add_library(flutter_llama_cpp SHARED
+    flutter_llama_cpp.c
+)
+
+# Set target properties
+set_target_properties(flutter_llama_cpp PROPERTIES
+    CXX_VISIBILITY_PRESET hidden
+    C_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
+)
+
+# Include directories
+target_include_directories(flutter_llama_cpp PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${LLAMA_CPP_DIR}/include
+    ${LLAMA_CPP_DIR}/ggml/include
+    ${LLAMA_CPP_DIR}/common
+)
+
+# Link libraries
+target_link_libraries(flutter_llama_cpp PRIVATE
+    llama
+    ggml
+)
+
+# Platform-specific linking
+if(APPLE)
+    target_link_libraries(flutter_llama_cpp PRIVATE
+        "-framework Accelerate"
+        "-framework Foundation"
+    )
+endif()
+
+if(ANDROID)
+    target_link_libraries(flutter_llama_cpp PRIVATE
+        log
+        android
+    )
+endif()
+
+# Install the library
+install(TARGETS flutter_llama_cpp
+    LIBRARY DESTINATION .
+    ARCHIVE DESTINATION .
+    RUNTIME DESTINATION .
+)

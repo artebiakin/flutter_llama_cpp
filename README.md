@@ -1,92 +1,246 @@
 # flutter_llama_cpp
 
-Flutter plugin for running llama.cpp models with Dart FFI
+A Flutter plugin that provides Dart FFI bindings for llama.cpp, enabling you to run large language models directly on mobile and desktop platforms.
 
-## Getting Started
+## Features
 
-This project is a starting point for a Flutter
-[FFI plugin](https://flutter.dev/to/ffi-package),
-a specialized package that includes native code directly invoked with Dart FFI.
+- 🚀 High-performance inference using llama.cpp
+- 📱 Cross-platform support (iOS, Android, macOS, Windows, Linux)
+- 🔧 C++ shim layer for stable FFI interface
+- 🎯 Type-safe Dart API with error handling
+- 🛠️ Automatic native builds using CMake
+- 💾 Support for GGUF model format
 
-## Project structure
+## Quick Start
 
-This template uses the following structure:
-
-* `src`: Contains the native source code, and a CmakeFile.txt file for building
-  that source code into a dynamic library.
-
-* `lib`: Contains the Dart code that defines the API of the plugin, and which
-  calls into the native code using `dart:ffi`.
-
-* platform folders (`android`, `ios`, `windows`, etc.): Contains the build files
-  for building and bundling the native code library with the platform application.
-
-## Building and bundling native code
-
-The `pubspec.yaml` specifies FFI plugins as follows:
+### 1. Add to your pubspec.yaml
 
 ```yaml
-  plugin:
-    platforms:
-      some_platform:
-        ffiPlugin: true
+dependencies:
+  flutter_llama_cpp: ^0.0.1
 ```
 
-This configuration invokes the native build for the various target platforms
-and bundles the binaries in Flutter applications using these FFI plugins.
+### 2. Initialize the library
 
-This can be combined with dartPluginClass, such as when FFI is used for the
-implementation of one platform in a federated plugin:
+```dart
+import 'package:flutter_llama_cpp/flutter_llama_cpp.dart';
 
-```yaml
-  plugin:
-    implements: some_other_plugin
-    platforms:
-      some_platform:
-        dartPluginClass: SomeClass
-        ffiPlugin: true
+// Initialize llama.cpp
+final initResult = LlamaFlutter.initialize();
+if (initResult.isError) {
+  print('Failed to initialize: ${initResult.error}');
+  return;
+}
+
+// Get library info
+final infoResult = LlamaFlutter.getInfo();
+if (infoResult.isSuccess) {
+  print('Library info: ${infoResult.value}');
+}
 ```
 
-A plugin can have both FFI and method channels:
+### 3. Load a model and generate text
 
-```yaml
-  plugin:
-    platforms:
-      some_platform:
-        pluginClass: SomeName
-        ffiPlugin: true
+```dart
+// Load a GGUF model
+final modelResult = LlamaModel.load('/path/to/your/model.gguf');
+if (modelResult.isError) {
+  print('Failed to load model: ${modelResult.error}');
+  return;
+}
+
+final model = modelResult.value;
+
+// Create inference context
+final contextResult = model.createContext();
+if (contextResult.isError) {
+  print('Failed to create context: ${contextResult.error}');
+  model.dispose();
+  return;
+}
+
+final context = contextResult.value;
+
+// Evaluate a prompt
+final evalResult = context.evaluatePrompt("Hello, my name is");
+if (evalResult.isError) {
+  print('Failed to evaluate prompt: ${evalResult.error}');
+  context.dispose();
+  model.dispose();
+  return;
+}
+
+// Generate tokens
+final params = GenerationParams(
+  nPredict: 50,
+  temperature: 0.8,
+  topK: 40,
+  topP: 0.9,
+);
+
+String generatedText = "Hello, my name is";
+for (int i = 0; i < 50; i++) {
+  final genResult = context.generateNext(params);
+  if (genResult.isError) {
+    print('Generation error: ${genResult.error}');
+    break;
+  }
+  
+  final result = genResult.value;
+  if (result.isEndOfSequence) {
+    print('End of sequence reached');
+    break;
+  }
+  
+  generatedText += result.token;
+  print('Generated: $generatedText');
+}
+
+// Clean up
+context.dispose();
+model.dispose();
 ```
 
-The native build systems that are invoked by FFI (and method channel) plugins are:
+## API Reference
 
-* For Android: Gradle, which invokes the Android NDK for native builds.
-  * See the documentation in android/build.gradle.
-* For iOS and MacOS: Xcode, via CocoaPods.
-  * See the documentation in ios/flutter_llama_cpp.podspec.
-  * See the documentation in macos/flutter_llama_cpp.podspec.
-* For Linux and Windows: CMake.
-  * See the documentation in linux/CMakeLists.txt.
-  * See the documentation in windows/CMakeLists.txt.
+### LlamaFlutter
 
-## Binding to native code
+The main class for library initialization and global operations.
 
-To use the native code, bindings in Dart are needed.
-To avoid writing these by hand, they are generated from the header file
-(`src/flutter_llama_cpp.h`) by `package:ffigen`.
-Regenerate the bindings by running `dart run ffigen --config ffigen.yaml`.
+- `LlamaFlutter.initialize()` - Initialize the llama.cpp library
+- `LlamaFlutter.getInfo()` - Get library version and build information
 
-## Invoking native code
+### LlamaModel
 
-Very short-running native functions can be directly invoked from any isolate.
-For example, see `sum` in `lib/flutter_llama_cpp.dart`.
+Represents a loaded language model.
 
-Longer-running functions should be invoked on a helper isolate to avoid
-dropping frames in Flutter applications.
-For example, see `sumAsync` in `lib/flutter_llama_cpp.dart`.
+- `LlamaModel.load(String path)` - Load a model from a GGUF file
+- `getInfo()` - Get model information (architecture, size, etc.)
+- `createContext([int? contextSize])` - Create an inference context
+- `dispose()` - Free the model resources
 
-## Flutter help
+### LlamaContext
 
-For help getting started with Flutter, view our
-[online documentation](https://docs.flutter.dev), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Represents an inference context for text generation.
 
+- `evaluatePrompt(String prompt)` - Process initial prompt
+- `generateNext([GenerationParams? params])` - Generate next token
+- `cancel()` - Cancel ongoing generation
+- `reset()` - Reset context state
+- `dispose()` - Free context resources
+
+### GenerationParams
+
+Configuration for text generation.
+
+```dart
+GenerationParams({
+  int nPredict = -1,        // Number of tokens to generate
+  int topK = 40,            // Top-K sampling
+  double topP = 0.9,        // Top-P sampling
+  double temperature = 0.8,  // Temperature for randomness
+  double repeatPenalty = 1.1, // Repetition penalty
+  bool penalizeNewlines = false, // Penalize newlines
+  int seed = -1,            // Random seed (-1 for random)
+})
+```
+
+### LlamaResult<T>
+
+A result type that represents either success or error.
+
+- `isSuccess` / `isError` - Check result status
+- `value` - Get the result value (throws if error)
+- `error` - Get the error message (throws if success)
+- `map<U>(transform)` - Transform the value if successful
+- `fold<U>(onSuccess, onError)` - Handle both cases
+
+## Development Setup
+
+### Prerequisites
+
+- Flutter SDK
+- CMake 3.18+
+- C++17 compatible compiler
+- Git with submodules support
+
+### Building from Source
+
+1. Check vendor dependency versions:
+```bash
+./tool/check_versions.sh
+```
+
+2. Generate FFI bindings:
+```bash
+dart run ffigen --config ffigen.yaml
+```
+
+3. Run the example:
+```bash
+cd example
+flutter run
+```
+
+### Updating Dependencies
+
+To update llama.cpp to a newer version:
+```bash
+./tool/update_llama_cpp.sh <commit-hash>
+```
+
+For more details, see [`VENDOR_DEPENDENCIES.md`](VENDOR_DEPENDENCIES.md).
+
+### Project Structure
+
+```
+flutter_llama_cpp/
+├── lib/
+│   ├── flutter_llama_cpp.dart                      # High-level Dart API
+│   └── flutter_llama_cpp_bindings_generated.dart   # Generated FFI bindings
+├── src/
+│   ├── flutter_llama_cpp.h                         # C API header
+│   ├── flutter_llama_cpp.c                         # C implementation
+│   ├── flutter_llama_cpp_stub.c                    # Stub for testing
+│   ├── CMakeLists.txt                               # CMake build configuration
+│   └── vendor/
+│       └── llama.cpp/                               # llama.cpp (b6316)
+├── tool/                                            # Development tools
+│   ├── check_versions.sh                           # Check vendor versions
+│   ├── update_llama_cpp.sh                         # Update llama.cpp
+│   └── version_info.yaml                           # Version tracking
+├── hook/
+│   └── build.dart                                   # Native assets build hook
+├── ffigen.yaml                                      # FFI generation config
+├── VENDOR_DEPENDENCIES.md                          # Dependency documentation
+└── example/                                         # Demo application
+```
+
+### Architecture
+
+The plugin uses a layered architecture:
+
+1. **llama.cpp** - The core C++ inference engine (`src/vendor/llama.cpp/`)
+   - Version: `b6316` (commit hash)
+   - Source: https://github.com/ggerganov/llama.cpp
+   - Integration: Git subtree for version control
+2. **C++ Shim Layer** (`src/`) - Stable C API wrapper
+3. **FFI Bindings** (`lib/flutter_llama_cpp_bindings_generated.dart`) - Generated Dart bindings
+4. **High-level API** (`lib/flutter_llama_cpp.dart`) - Type-safe Dart interface
+5. **Build Hook** (`hook/build.dart`) - Native asset compilation
+
+## Platform Support
+
+| Platform | Architecture | Status |
+|----------|--------------|--------|
+| Android  | ARM64, x86_64 | ✅ |
+| iOS      | ARM64        | ✅ |
+| macOS    | ARM64, x86_64 | ✅ |
+| Linux    | x86_64       | ✅ |
+| Windows  | x86_64       | ✅ |
+
+## License
+
+This project is licensed under the MIT License.
+
+The bundled llama.cpp library is also licensed under the MIT License.

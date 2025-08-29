@@ -1,16 +1,47 @@
 # flutter_llama_cpp_example
 
-Demonstrates how to use the flutter_llama_cpp plugin.
+Demonstrates how to use the flutter_llama_cpp plugin for running llama.cpp models in Flutter.
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+This example shows how to:
+- Initialize the llama.cpp library
+- Get library information
+- Load and use language models (when available)
+- Handle errors and results using the type-safe API
 
-A few resources to get you started if this is your first Flutter project:
+## Running the Example
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+1. Make sure you have Flutter installed
+2. Run the example:
+   ```bash
+   flutter run
+   ```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Key Features Demonstrated
+
+- **Library Initialization**: Shows how to initialize the llama.cpp library
+- **Error Handling**: Demonstrates proper error handling with `LlamaResult<T>`
+- **Model Management**: Shows how to load and manage language models
+- **Text Generation**: Examples of generating text with different parameters
+
+## API Usage
+
+```dart
+import 'package:flutter_llama_cpp/flutter_llama_cpp.dart';
+
+// Initialize the library
+final initResult = LlamaFlutter.initialize();
+if (initResult.isError) {
+  print('Failed to initialize: ${initResult.error}');
+  return;
+}
+
+// Get library info
+final infoResult = LlamaFlutter.getInfo();
+if (infoResult.isSuccess) {
+  print('Library info: ${infoResult.value}');
+}
+```
+
+For more detailed usage examples, see the main library documentation.

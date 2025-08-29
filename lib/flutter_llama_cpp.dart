@@ -1,131 +1,453 @@
+/// Flutter plugin for llama.cpp integration via Dart FFI.
+/// 
+/// This plugin provides a high-level Dart API for running Large Language Models
+/// using llama.cpp as the inference engine.
+/// 
+/// ## Dependencies
+/// - llama.cpp: Version b6316 (statically linked)
+/// - ggml: Included with llama.cpp
+/// 
+/// ## Supported Platforms
+/// - Android (arm64-v8a)
+/// - iOS (arm64)  
+/// - macOS (arm64, x86_64)
+/// - Windows (x86_64)
+/// - Linux (x86_64)
+/// 
+/// ## Example Usage
+/// ```dart
+/// // Initialize the plugin
+/// final result = LlamaFlutter.initialize();
+/// if (result.isSuccess) {
+///   // Load a model
+///   final modelResult = LlamaModel.load('path/to/model.gguf');
+///   if (modelResult.isSuccess) {
+///     final model = modelResult.value;
+///     // Use the model...
+///   }
+/// }
+/// ```
+library;
 
-import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
-import 'dart:isolate';
+
+import 'package:ffi/ffi.dart';
 
 import 'flutter_llama_cpp_bindings_generated.dart';
 
-/// A very short-lived native function.
-///
-/// For very short-lived functions, it is fine to call them on the main isolate.
-/// They will block the Dart execution while running the native function, so
-/// only do this for native functions which are guaranteed to be short-lived.
-int sum(int a, int b) => _bindings.sum(a, b);
+export 'flutter_llama_cpp_bindings_generated.dart';
 
-/// A longer lived native function, which occupies the thread calling it.
-///
-/// Do not call these kind of native functions in the main isolate. They will
-/// block Dart execution. This will cause dropped frames in Flutter applications.
-/// Instead, call these native functions on a separate isolate.
-///
-/// Modify this to suit your own use case. Example use cases:
-///
-/// 1. Reuse a single isolate for various different kinds of requests.
-/// 2. Use multiple helper isolates for parallel execution.
-Future<int> sumAsync(int a, int b) async {
-  final SendPort helperIsolateSendPort = await _helperIsolateSendPort;
-  final int requestId = _nextSumRequestId++;
-  final _SumRequest request = _SumRequest(requestId, a, b);
-  final Completer<int> completer = Completer<int>();
-  _sumRequests[requestId] = completer;
-  helperIsolateSendPort.send(request);
-  return completer.future;
+/// A Dart wrapper for the llama.cpp library
+class LlamaFlutter {
+  static LlamaFlutterBindings? _bindings;
+  static bool _initialized = false;
+
+  /// Get the native bindings for llama.cpp
+  static LlamaFlutterBindings get bindings {
+    _bindings ??= LlamaFlutterBindings(_dylib);
+    return _bindings!;
+  }
+
+  /// Initialize the llama.cpp library
+  static LlamaResult<void> initialize() {
+    if (_initialized) {
+      return LlamaResult.success(null);
+    }
+
+    final result = bindings.lf_init();
+    if (result == lf_error_t.LF_OK) {
+      _initialized = true;
+      return LlamaResult.success(null);
+    } else {
+      final error = _getLastError();
+      return LlamaResult.error(error);
+    }
+  }
+
+  /// Get library information
+  static LlamaResult<String> getInfo() {
+    final buffer = calloc<Char>(1024);
+    try {
+      final result = bindings.lf_info(buffer, 1024);
+      if (result == lf_error_t.LF_OK) {
+        return LlamaResult.success(buffer.cast<Utf8>().toDartString());
+      } else {
+        final error = _getLastError();
+        return LlamaResult.error(error);
+      }
+    } finally {
+      calloc.free(buffer);
+    }
+  }
+
+  static String _getLastError() {
+    final buffer = calloc<Char>(1024);
+    try {
+      bindings.lf_last_error(buffer, 1024);
+      return buffer.cast<Utf8>().toDartString();
+    } finally {
+      calloc.free(buffer);
+    }
+  }
 }
 
-const String _libName = 'flutter_llama_cpp';
+/// A high-level wrapper for a llama.cpp model
+class LlamaModel {
+  final Pointer<lf_model> _handle;
+  bool _disposed = false;
 
-/// The dynamic library in which the symbols for [FlutterLlamaCppBindings] can be found.
+  LlamaModel._(this._handle);
+
+  /// Load a model from a GGUF file
+  static LlamaResult<LlamaModel> load(String modelPath) {
+    final pathPtr = modelPath.toNativeUtf8();
+    final modelPtr = calloc<Pointer<lf_model>>();
+
+    try {
+      final result = LlamaFlutter.bindings.lf_model_load(
+        pathPtr.cast<Char>(),
+        modelPtr,
+      );
+
+      if (result == lf_error_t.LF_OK) {
+        final model = LlamaModel._(modelPtr.value);
+        return LlamaResult.success(model);
+      } else {
+        final error = LlamaFlutter._getLastError();
+        return LlamaResult.error(error);
+      }
+    } finally {
+      calloc.free(pathPtr);
+      calloc.free(modelPtr);
+    }
+  }
+
+  /// Get model information
+  LlamaResult<ModelInfo> getInfo() {
+    if (_disposed) {
+      return LlamaResult.error('Model has been disposed');
+    }
+
+    final infoPtr = calloc<lf_model_info_t>();
+    try {
+      final result = LlamaFlutter.bindings.lf_model_info(_handle, infoPtr);
+      if (result == lf_error_t.LF_OK) {
+        final info = ModelInfo._fromNative(infoPtr.ref);
+        return LlamaResult.success(info);
+      } else {
+        final error = LlamaFlutter._getLastError();
+        return LlamaResult.error(error);
+      }
+    } finally {
+      calloc.free(infoPtr);
+    }
+  }
+
+  /// Create a context for inference
+  LlamaResult<LlamaContext> createContext([int? contextSize]) {
+    if (_disposed) {
+      return LlamaResult.error('Model has been disposed');
+    }
+
+    final contextPtr = calloc<Pointer<lf_context>>();
+    try {
+      final result = LlamaFlutter.bindings.lf_context_create(
+        _handle,
+        contextSize ?? 0,
+        contextPtr,
+      );
+
+      if (result == lf_error_t.LF_OK) {
+        final context = LlamaContext._(contextPtr.value);
+        return LlamaResult.success(context);
+      } else {
+        final error = LlamaFlutter._getLastError();
+        return LlamaResult.error(error);
+      }
+    } finally {
+      calloc.free(contextPtr);
+    }
+  }
+
+  /// Dispose the model and free native resources
+  void dispose() {
+    if (!_disposed) {
+      LlamaFlutter.bindings.lf_model_free(_handle);
+      _disposed = true;
+    }
+  }
+}
+
+/// A high-level wrapper for a llama.cpp context
+class LlamaContext {
+  final Pointer<lf_context> _handle;
+  bool _disposed = false;
+
+  LlamaContext._(this._handle);
+
+  /// Evaluate a prompt and prepare for generation
+  LlamaResult<void> evaluatePrompt(String prompt) {
+    if (_disposed) {
+      return LlamaResult.error('Context has been disposed');
+    }
+
+    final promptPtr = prompt.toNativeUtf8();
+    try {
+      final result = LlamaFlutter.bindings.lf_eval_prompt(
+        _handle,
+        promptPtr.cast<Char>(),
+      );
+
+      if (result == lf_error_t.LF_OK) {
+        return LlamaResult.success(null);
+      } else {
+        final error = LlamaFlutter._getLastError();
+        return LlamaResult.error(error);
+      }
+    } finally {
+      calloc.free(promptPtr);
+    }
+  }
+
+  /// Generate the next token
+  LlamaResult<GenerationResult> generateNext([GenerationParams? params]) {
+    if (_disposed) {
+      return LlamaResult.error('Context has been disposed');
+    }
+
+    final paramsPtr = calloc<lf_generation_params_t>();
+    final tokenBuffer = calloc<Char>(256);
+    final isEosPtr = calloc<Bool>();
+
+    try {
+      if (params != null) {
+        params._toNative(paramsPtr.ref);
+      } else {
+        LlamaFlutter.bindings.lf_generation_params_default(paramsPtr);
+      }
+
+      final result = LlamaFlutter.bindings.lf_generate_next(
+        _handle,
+        paramsPtr,
+        tokenBuffer,
+        256,
+        isEosPtr,
+      );
+
+      if (result == lf_error_t.LF_OK) {
+        final token = tokenBuffer.cast<Utf8>().toDartString();
+        final isEos = isEosPtr.value;
+        return LlamaResult.success(GenerationResult(token, isEos));
+      } else {
+        final error = LlamaFlutter._getLastError();
+        return LlamaResult.error(error);
+      }
+    } finally {
+      calloc.free(paramsPtr);
+      calloc.free(tokenBuffer);
+      calloc.free(isEosPtr);
+    }
+  }
+
+  /// Cancel ongoing generation
+  LlamaResult<void> cancel() {
+    if (_disposed) {
+      return LlamaResult.error('Context has been disposed');
+    }
+
+    final result = LlamaFlutter.bindings.lf_cancel(_handle);
+    if (result == lf_error_t.LF_OK) {
+      return LlamaResult.success(null);
+    } else {
+      final error = LlamaFlutter._getLastError();
+      return LlamaResult.error(error);
+    }
+  }
+
+  /// Reset context state
+  LlamaResult<void> reset() {
+    if (_disposed) {
+      return LlamaResult.error('Context has been disposed');
+    }
+
+    final result = LlamaFlutter.bindings.lf_reset(_handle);
+    if (result == lf_error_t.LF_OK) {
+      return LlamaResult.success(null);
+    } else {
+      final error = LlamaFlutter._getLastError();
+      return LlamaResult.error(error);
+    }
+  }
+
+  /// Dispose the context and free native resources
+  void dispose() {
+    if (!_disposed) {
+      LlamaFlutter.bindings.lf_context_free(_handle);
+      _disposed = true;
+    }
+  }
+}
+
+/// Model information
+class ModelInfo {
+  final String name;
+  final String architecture;
+  final int vocabSize;
+  final int contextSizeMax;
+  final int embeddingSize;
+  final int parameterCount;
+  final int sizeBytes;
+
+  ModelInfo._({
+    required this.name,
+    required this.architecture,
+    required this.vocabSize,
+    required this.contextSizeMax,
+    required this.embeddingSize,
+    required this.parameterCount,
+    required this.sizeBytes,
+  });
+
+  factory ModelInfo._fromNative(lf_model_info_t info) {
+    return ModelInfo._(
+      name: _arrayToString(info.name),
+      architecture: _arrayToString(info.architecture),
+      vocabSize: info.vocab_size,
+      contextSizeMax: info.n_ctx_max,
+      embeddingSize: info.n_embd,
+      parameterCount: info.n_params,
+      sizeBytes: info.size_bytes,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'ModelInfo(name: $name, architecture: $architecture, '
+        'vocabSize: $vocabSize, contextSizeMax: $contextSizeMax, '
+        'embeddingSize: $embeddingSize, parameterCount: $parameterCount, '
+        'sizeBytes: $sizeBytes)';
+  }
+}
+
+/// Generation parameters
+class GenerationParams {
+  final int nPredict;
+  final int topK;
+  final double topP;
+  final double temperature;
+  final double repeatPenalty;
+  final bool penalizeNewlines;
+  final int seed;
+
+  GenerationParams({
+    this.nPredict = -1,
+    this.topK = 40,
+    this.topP = 0.9,
+    this.temperature = 0.8,
+    this.repeatPenalty = 1.1,
+    this.penalizeNewlines = false,
+    this.seed = -1,
+  });
+
+  void _toNative(lf_generation_params_t params) {
+    params.n_predict = nPredict;
+    params.top_k = topK;
+    params.top_p = topP;
+    params.temp = temperature;
+    params.repeat_penalty = repeatPenalty;
+    params.penalize_nl = penalizeNewlines;
+    params.seed = seed;
+  }
+}
+
+/// Result of generating a single token
+class GenerationResult {
+  final String token;
+  final bool isEndOfSequence;
+
+  GenerationResult(this.token, this.isEndOfSequence);
+
+  @override
+  String toString() {
+    return 'GenerationResult(token: "$token", isEndOfSequence: $isEndOfSequence)';
+  }
+}
+
+/// A result type that can represent either success or failure
+class LlamaResult<T> {
+  final T? _value;
+  final String? _error;
+  final bool _isSuccess;
+
+  LlamaResult.success(this._value) : _error = null, _isSuccess = true;
+  LlamaResult.error(this._error) : _value = null, _isSuccess = false;
+
+  bool get isSuccess => _isSuccess;
+  bool get isError => !_isSuccess;
+
+  T get value {
+    if (!_isSuccess) {
+      throw StateError('Attempted to get value from error result: $_error');
+    }
+    return _value as T;
+  }
+
+  String get error {
+    if (_isSuccess) {
+      throw StateError('Attempted to get error from success result');
+    }
+    return _error!;
+  }
+
+  /// Transform the value if this is a success result
+  LlamaResult<U> map<U>(U Function(T) transform) {
+    if (_isSuccess) {
+      return LlamaResult.success(transform(_value as T));
+    } else {
+      return LlamaResult.error(_error!);
+    }
+  }
+
+  /// Handle both success and error cases
+  U fold<U>(U Function(T) onSuccess, U Function(String) onError) {
+    if (_isSuccess) {
+      return onSuccess(_value as T);
+    } else {
+      return onError(_error!);
+    }
+  }
+}
+
+/// The dynamic library that contains the llama.cpp implementation
+/// Built with llama.cpp version b6316
 final DynamicLibrary _dylib = () {
   if (Platform.isMacOS || Platform.isIOS) {
-    return DynamicLibrary.open('$_libName.framework/$_libName');
+    // For native assets on Apple platforms, try framework first
+    try {
+      return DynamicLibrary.open('flutter_llama_cpp.framework/flutter_llama_cpp');
+    } catch (e) {
+      // Fallback to process lookup
+      return DynamicLibrary.process();
+    }
   }
   if (Platform.isAndroid || Platform.isLinux) {
-    return DynamicLibrary.open('lib$_libName.so');
+    return DynamicLibrary.open('libflutter_llama_cpp.so');
   }
   if (Platform.isWindows) {
-    return DynamicLibrary.open('$_libName.dll');
+    return DynamicLibrary.open('flutter_llama_cpp.dll');
   }
   throw UnsupportedError('Unknown platform: ${Platform.operatingSystem}');
 }();
 
-/// The bindings to the native functions in [_dylib].
-final FlutterLlamaCppBindings _bindings = FlutterLlamaCppBindings(_dylib);
-
-
-/// A request to compute `sum`.
-///
-/// Typically sent from one isolate to another.
-class _SumRequest {
-  final int id;
-  final int a;
-  final int b;
-
-  const _SumRequest(this.id, this.a, this.b);
+/// Helper function to convert Array<[Char]> to String
+String _arrayToString(Array<Char> array) {
+  final List<int> chars = [];
+  for (int i = 0; i < 256; i++) {
+    // Maximum array size
+    final char = array[i];
+    if (char == 0) break; // Null terminator
+    chars.add(char);
+  }
+  return String.fromCharCodes(chars);
 }
-
-/// A response with the result of `sum`.
-///
-/// Typically sent from one isolate to another.
-class _SumResponse {
-  final int id;
-  final int result;
-
-  const _SumResponse(this.id, this.result);
-}
-
-/// Counter to identify [_SumRequest]s and [_SumResponse]s.
-int _nextSumRequestId = 0;
-
-/// Mapping from [_SumRequest] `id`s to the completers corresponding to the correct future of the pending request.
-final Map<int, Completer<int>> _sumRequests = <int, Completer<int>>{};
-
-/// The SendPort belonging to the helper isolate.
-Future<SendPort> _helperIsolateSendPort = () async {
-  // The helper isolate is going to send us back a SendPort, which we want to
-  // wait for.
-  final Completer<SendPort> completer = Completer<SendPort>();
-
-  // Receive port on the main isolate to receive messages from the helper.
-  // We receive two types of messages:
-  // 1. A port to send messages on.
-  // 2. Responses to requests we sent.
-  final ReceivePort receivePort = ReceivePort()
-    ..listen((dynamic data) {
-      if (data is SendPort) {
-        // The helper isolate sent us the port on which we can sent it requests.
-        completer.complete(data);
-        return;
-      }
-      if (data is _SumResponse) {
-        // The helper isolate sent us a response to a request we sent.
-        final Completer<int> completer = _sumRequests[data.id]!;
-        _sumRequests.remove(data.id);
-        completer.complete(data.result);
-        return;
-      }
-      throw UnsupportedError('Unsupported message type: ${data.runtimeType}');
-    });
-
-  // Start the helper isolate.
-  await Isolate.spawn((SendPort sendPort) async {
-    final ReceivePort helperReceivePort = ReceivePort()
-      ..listen((dynamic data) {
-        // On the helper isolate listen to requests and respond to them.
-        if (data is _SumRequest) {
-          final int result = _bindings.sum_long_running(data.a, data.b);
-          final _SumResponse response = _SumResponse(data.id, result);
-          sendPort.send(response);
-          return;
-        }
-        throw UnsupportedError('Unsupported message type: ${data.runtimeType}');
-      });
-
-    // Send the port to the main isolate on which we can receive requests.
-    sendPort.send(helperReceivePort.sendPort);
-  }, receivePort.sendPort);
-
-  // Wait until the helper isolate has sent us back the SendPort on which we
-  // can start sending requests.
-  return completer.future;
-}();
